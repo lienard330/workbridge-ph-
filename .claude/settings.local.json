@@ -33,7 +33,9 @@
       "Bash(php -S 127.0.0.1:8080 server.php)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Total jobs: {d[\\\\\"total\\\\\"]}'\\); [print\\(f'  - {j[\\\\\"title\\\\\"]} @ {j[\\\\\"company\\\\\"][\\\\\"name\\\\\"]}'\\) for j in d['data']]\")",
       "Bash(gh --version)",
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(git commit -m 'Initial commit — WorkBridge PH job portal *)",
+      "Bash(git remote *)"
     ]
   }
 }
