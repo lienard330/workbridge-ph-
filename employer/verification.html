@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Employer Verification</h1>
+        <div class="card mb-4">
+          <div class="card-body">
+            <p class="mb-3">Status: <span id="verify-status" class="badge badge-pending">Loading…</span></p>
+            <p class="text-secondary small">Submit your business permit or other official documents to get verified. Verified employers get a trust badge on their listings.</p>
+            <div class="form-group mt-3">
+              <label class="form-label">Document Type</label>
+              <select id="doc-type" class="form-select mb-2" style="max-width:240px">
+                <option value="business_permit">Business Permit</option>
+                <option value="bir_certificate">BIR Certificate</option>
+                <option value="sec_registration">SEC Registration</option>
+                <option value="dti_certificate">DTI Certificate</option>
+                <option value="other">Other</option>
+              </select>
+              <label class="form-label">Upload document</label>
+              <input type="file" id="proof-file" class="form-input mb-2" accept=".pdf,.jpg,.jpeg,.png">
+              <button id="upload-proof" class="btn btn-primary">Upload Document</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiMyCompany, apiUploadVerificationDoc } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+
+    renderLayout('employer', 'Verification');
+
+    apiMyCompany().then(co => {
+      const vs = co?.verified_status || 'Unverified';
+      const el = document.getElementById('verify-status');
+      el.textContent = vs;
+      el.className = 'badge badge-' + (vs === 'Verified' ? 'verified' : vs === 'Rejected' ? 'rejected' : 'pending');
+    }).catch(() => {});
+
+    document.getElementById('upload-proof').onclick = async () => {
+      const file = document.getElementById('proof-file').files[0];
+      const docType = document.getElementById('doc-type').value;
+      if (!file) { toastError('Select a file first'); return; }
+      const btn = document.getElementById('upload-proof');
+      btn.disabled = true;
+      btn.textContent = 'Uploading…';
+      try {
+        await apiUploadVerificationDoc(file, docType);
+        toastSuccess('Document uploaded. Your verification is under review.');
+        document.getElementById('proof-file').value = '';
+        document.getElementById('verify-status').textContent = 'Pending';
+        document.getElementById('verify-status').className = 'badge badge-pending';
+      } catch (err) { toastError(err.message); }
+      finally { btn.disabled = false; btn.textContent = 'Upload Document'; }
+    };
+  </script>
+</body>
+</html>

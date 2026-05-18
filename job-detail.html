@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Detail — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/public.css">
+  <link rel="stylesheet" href="assets/css/seeker.css">
+</head>
+<body>
+  <header class="public-nav" id="public-header">
+    <div class="public-nav-inner">
+      <a href="index.html" class="public-nav-brand"><img src="assets/img/logo.png" alt="" class="public-nav-logo"><span>WorkBridge PH</span></a>
+      <ul class="public-nav-links">
+        <li><a href="jobs.html">Jobs</a></li>
+        <li><a href="companies.html">Companies</a></li>
+        <li><a href="auth/login.html" class="btn btn-primary" id="login-link">Log in</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container page-transition py-4">
+    <div id="job-content" class="row">
+      <div class="col-lg-8">
+        <div class="card mb-4">
+          <div class="card-body">
+            <div id="job-main"></div>
+            <div class="tabs mt-4">
+              <button class="tab active" data-tab="overview">Overview</button>
+              <button class="tab" data-tab="responsibilities">Responsibilities</button>
+              <button class="tab" data-tab="qualifications">Qualifications</button>
+              <button class="tab" data-tab="benefits">Benefits</button>
+            </div>
+            <div id="tab-overview" class="tab-content">
+              <p id="job-description"></p>
+            </div>
+            <div id="tab-responsibilities" class="tab-content" style="display:none">
+              <p id="job-responsibilities"></p>
+            </div>
+            <div id="tab-qualifications" class="tab-content" style="display:none">
+              <p id="job-requirements"></p>
+            </div>
+            <div id="tab-benefits" class="tab-content" style="display:none">
+              <p id="job-benefits"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <!-- sticky-lg-top: only sticks on lg+ where it's a side column.
+             On mobile it stacks below the main content and flows naturally. -->
+        <div class="card sticky-lg-top" style="top: 80px;">
+          <div class="card-body" id="apply-card">
+            <p class="text-secondary mb-0">Loading…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="assets/js/app.js"></script>
+  <script type="module">
+    import { getJobById } from './assets/js/jobs.module.js';
+    import { getQueryParams } from './assets/js/router.js';
+    import { getCurrentUser } from './assets/js/store.js';
+    import { apiApply, apiSaveJob, apiUnsaveJob, apiSavedJobs, apiSeekerProfile, apiMyApplications } from './assets/js/api.js';
+    import { openModal } from './assets/js/ui.modal.js';
+    import { toastSuccess, toastError } from './assets/js/ui.toast.js';
+    import { esc, formatSalaryRange, companyAvatar, verifiedBadge } from './assets/js/utils.js';
+
+    const params = getQueryParams();
+    const user = getCurrentUser();
+
+    // If user is logged in, show dashboard layout instead of public nav
+    if (user) {
+      document.getElementById('public-header').style.display = 'none';
+      document.body.classList.add('wb-loading');
+      const mainEl = document.querySelector('main');
+      mainEl.classList.remove('container', 'py-4');
+      mainEl.classList.add('app-main');
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'app-content';
+      while (mainEl.firstChild) contentWrap.appendChild(mainEl.firstChild);
+      mainEl.appendChild(contentWrap);
+      const appLayout = document.createElement('div');
+      appLayout.id = 'app-layout';
+      appLayout.className = 'app-layout';
+      mainEl.parentNode.insertBefore(appLayout, mainEl);
+      appLayout.appendChild(mainEl);
+      import('./assets/js/layout.js').then(m => m.renderLayout(user.role, 'Job Detail'));
+    }
+
+    const contentEl = document.getElementById('job-content');
+    document.getElementById('job-main').innerHTML = '<p class="text-secondary">Loading…</p>';
+
+    async function init() {
+      let job, savedIds = new Set(), seekerProfile = null, alreadyApplied = false;
+
+      try {
+        job = await getJobById(params.id);
+      } catch {
+        contentEl.innerHTML = '<div class="empty-state"><p>Job not found.</p><a href="jobs.html">Browse jobs</a></div>';
+        return;
+      }
+
+      // Load seeker state in parallel — saved jobs, profile, and applications (to detect already-applied)
+      if (user?.role === 'seeker') {
+        const [savedRes, profileRes, appsRes] = await Promise.allSettled([
+          apiSavedJobs(), apiSeekerProfile(), apiMyApplications()
+        ]);
+        if (savedRes.status === 'fulfilled') {
+          savedIds = new Set((savedRes.value.data || savedRes.value).map(s => String(s.job_listing_id)));
+        }
+        if (profileRes.status === 'fulfilled') seekerProfile = profileRes.value;
+        if (appsRes.status === 'fulfilled') {
+          alreadyApplied = (appsRes.value.data || appsRes.value).some(a => String(a.job_listing_id) === String(job.id));
+        }
+      }
+
+      document.title = job.title + ' — WorkBridge PH';
+
+      document.getElementById('job-main').innerHTML = `
+        <div class="d-flex gap-3 align-items-start mb-3">
+          ${companyAvatar(job.company, 56)}
+          <div style="min-width:0">
+            <h1 class="mb-1">${esc(job.title)}</h1>
+            <p class="job-card-company mb-0">${esc(job.company?.name || 'Company')}${verifiedBadge(job.company)}</p>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge badge-teal">${esc(job.type)}</span>
+          <span><i class="bi bi-geo-alt"></i> ${esc(job.location)}</span>
+          <span><i class="bi bi-clock"></i> Posted ${new Date(job.postedAt).toLocaleDateString()}</span>
+        </div>
+      `;
+
+      document.getElementById('job-description').textContent = job.description || '';
+      document.getElementById('job-responsibilities').textContent = job.description || '';
+      document.getElementById('job-requirements').textContent = job.requirements || '';
+      document.getElementById('job-benefits').textContent = 'Contact the employer for benefits information.';
+
+      document.querySelectorAll('.tab').forEach(t => {
+        t.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(x => x.style.display = 'none');
+          t.classList.add('active');
+          const el = document.getElementById('tab-' + t.dataset.tab);
+          if (el) el.style.display = 'block';
+        });
+      });
+
+      // Render the right-column card based on viewer role
+      renderActionCard(job);
+
+      function renderActionCard(job) {
+        const card = document.getElementById('apply-card');
+        const companyName = esc(job.company?.name || 'Company') + verifiedBadge(job.company);
+        const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
+
+        // Employer view
+        if (user?.role === 'employer') {
+          card.innerHTML = `
+            <h4 class="mb-3">${companyName}</h4>
+            <p class="job-card-salary mb-3">${salary}</p>
+            <div class="alert alert-info mb-3"><i class="bi bi-info-circle"></i> You're viewing this as an employer. Apply functionality is for job seekers only.</div>
+            <a href="employer/manage-jobs.html" class="btn btn-secondary w-100">Go to Manage Jobs</a>`;
+          return;
+        }
+
+        // Admin view
+        if (user?.role === 'admin') {
+          card.innerHTML = `
+            <h4 class="mb-3">${companyName}</h4>
+            <p class="job-card-salary mb-3">${salary}</p>
+            <div class="alert alert-info mb-3"><i class="bi bi-shield-check"></i> Admin view.</div>
+            <a href="admin/job-moderation.html" class="btn btn-secondary w-100">Open in Moderation</a>`;
+          return;
+        }
+
+        // Seeker / public view (Apply + Save)
+        const isSaved   = savedIds.has(String(job.id));
+        const applyText = alreadyApplied ? 'Applied' : 'Apply Now';
+        const applyDis  = alreadyApplied ? 'disabled' : '';
+        card.innerHTML = `
+          <h4 class="mb-3">Apply for this job</h4>
+          <p class="text-secondary mb-3">${companyName}</p>
+          <p class="job-card-salary mb-3">${salary}</p>
+          <button id="btn-apply" class="btn btn-primary btn-lg w-100" ${applyDis}>${applyText}</button>
+          <button id="btn-save" class="btn btn-secondary w-100 mt-2">
+            <i class="bi bi-bookmark${isSaved ? '-fill' : ''}"></i> ${isSaved ? 'Saved' : 'Save'}
+          </button>`;
+
+        document.getElementById('btn-apply').addEventListener('click', onApplyClick);
+        document.getElementById('btn-save').addEventListener('click', onSaveClick);
+      }
+
+      async function onApplyClick() {
+        if (!user) {
+          openModal({
+            title: 'Login Required',
+            body: '<p>Please log in to apply for this job.</p>',
+            footer: `<a href="auth/login.html?redirect=${encodeURIComponent('job-detail.html?id=' + job.id)}" class="btn btn-primary">Log in</a>`
+          });
+          return;
+        }
+        if (alreadyApplied) return;
+
+        const resumes  = seekerProfile?.resumes || [];
+        const hasResume = resumes.length > 0;
+        const skills = (seekerProfile?.skills || []).map(s => (s.skill || s).toLowerCase());
+        const tags   = (job.tags || []).map(t => t.toLowerCase());
+        const skillFit = tags.length === 0 ? 100
+          : Math.round((skills.filter(sk => tags.some(t => t.includes(sk) || sk.includes(t))).length / tags.length) * 100);
+
+        let warnings = '';
+        if (!hasResume) warnings += '<div class="alert alert-warning mb-2"><i class="bi bi-exclamation-triangle"></i> No resume uploaded. <a href="seeker/resume.html">Upload resume</a></div>';
+        if (skills.length === 0) warnings += '<div class="alert alert-warning mb-2">No skills on profile. <a href="seeker/profile.html">Update profile</a></div>';
+        else if (tags.length > 0) warnings += `<div class="alert alert-${skillFit >= 50 ? 'success' : 'info'} mb-2"><i class="bi bi-${skillFit >= 50 ? 'check-circle' : 'info-circle'}"></i> Skill match: <strong>${skillFit}%</strong></div>`;
+
+        const { close } = openModal({
+          title: 'Apply for Job',
+          body: `<p>Apply for <strong>${esc(job.title)}</strong>?</p>${warnings}${!hasResume ? '<p class="text-danger fw-bold">Upload a resume before applying.</p>' : ''}`,
+          footer: hasResume
+            ? '<button class="btn btn-secondary" id="modal-cancel">Cancel</button> <button class="btn btn-primary" id="modal-confirm">Confirm</button>'
+            : '<button class="btn btn-secondary" id="modal-cancel">Close</button>'
+        });
+
+        document.getElementById('modal-cancel')?.addEventListener('click', close);
+        document.getElementById('modal-confirm')?.addEventListener('click', async () => {
+          const primaryResume = resumes.find(r => r.is_primary) || resumes[0];
+          try {
+            await apiApply(job.id, { resume_id: primaryResume?.id, skill_fit: skillFit });
+            close();
+            toastSuccess('Application submitted!');
+            alreadyApplied = true;
+            renderActionCard(job);
+          } catch (err) { close(); toastError(err.message); }
+        });
+      }
+
+      async function onSaveClick() {
+        if (!user) {
+          openModal({ title: 'Login Required', body: '<p>Please log in to save jobs.</p>', footer: '<a href="auth/login.html" class="btn btn-primary">Log in</a>' });
+          return;
+        }
+        try {
+          if (savedIds.has(String(job.id))) {
+            await apiUnsaveJob(job.id);
+            savedIds.delete(String(job.id));
+            toastSuccess('Job removed from saved');
+          } else {
+            await apiSaveJob(job.id);
+            savedIds.add(String(job.id));
+            toastSuccess('Job saved');
+          }
+          renderActionCard(job);
+        } catch (err) { toastError(err.message); }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

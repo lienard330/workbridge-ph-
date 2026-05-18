@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post Job — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Post a Job</h1>
+        <div class="row">
+          <div class="col-lg-8">
+            <form id="job-form" class="card mb-4">
+              <div class="card-body">
+                <div class="form-group mb-3">
+                  <label class="form-label">Job Title *</label>
+                  <input type="text" name="title" class="form-input" required>
+                </div>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group mb-3">
+                      <label class="form-label">Job Type</label>
+                      <select name="type" class="form-select"><option value="Full-time">Full-time</option><option value="Part-time">Part-time</option><option value="Contract">Contract</option></select>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group mb-3">
+                      <label class="form-label">Setup</label>
+                      <select name="setup" class="form-select"><option value="On-site">On-site</option><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option></select>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Location *</label>
+                  <input type="text" name="location" class="form-input" required placeholder="e.g. Manila">
+                </div>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group mb-3">
+                      <label class="form-label">Salary Min (₱)</label>
+                      <input type="number" name="salaryMin" class="form-input" placeholder="15000">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group mb-3">
+                      <label class="form-label">Salary Max (₱)</label>
+                      <input type="number" name="salaryMax" class="form-input" placeholder="25000">
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Description *</label>
+                  <textarea name="description" class="form-textarea" required></textarea>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Requirements</label>
+                  <textarea name="requirements" class="form-textarea"></textarea>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Experience Level</label>
+                  <select name="experience" class="form-select">
+                    <option value="Entry level">Entry level</option>
+                    <option value="1-2 years">1-2 years</option>
+                    <option value="3-5 years">3-5 years</option>
+                    <option value="5+ years">5+ years</option>
+                  </select>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Tags (comma-separated)</label>
+                  <input type="text" name="tags" class="form-input" placeholder="PHP, JavaScript, Communication">
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Benefits</label>
+                  <input type="text" name="benefits" class="form-input" placeholder="HMO, 13th month pay">
+                </div>
+                <button type="submit" class="btn btn-primary">Submit for Review</button>
+              </div>
+            </form>
+          </div>
+          <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 80px;">
+              <div class="card-header"><h3 class="card-title mb-0">Preview</h3></div>
+              <div class="card-body" id="preview-panel">
+                <p class="text-muted small">Fill the form to see preview.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getCurrentUser } from '../assets/js/store.js';
+    import { apiCreateJob, apiMyCompany } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { formatSalaryRange } from '../assets/js/utils.js';
+
+    renderLayout('employer', 'Post Job');
+
+    const form = document.getElementById('job-form');
+    const preview = document.getElementById('preview-panel');
+    let companyName = 'Company';
+
+    apiMyCompany().then(c => { companyName = c?.name || 'Company'; }).catch(() => {});
+
+    form.querySelectorAll('input, select, textarea').forEach(el => {
+      el.addEventListener('input', updatePreview);
+      el.addEventListener('change', updatePreview);
+    });
+
+    function updatePreview() {
+      const fd = new FormData(form);
+      const title = fd.get('title') || 'Job Title';
+      const loc = fd.get('location') || 'Location';
+      const type = fd.get('type') || 'Full-time';
+      const salMin = fd.get('salary_min');
+      const salMax = fd.get('salary_max');
+      const sal = formatSalaryRange(salMin, salMax);
+      preview.innerHTML = `<h4>${title}</h4><p class="text-secondary small">${companyName}</p><p>${loc} · ${type}</p><p class="text-primary fw-bold">${sal}</p>`;
+    }
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      btn.textContent = 'Posting…';
+      const fd = new FormData(form);
+      try {
+        await apiCreateJob({
+          title: fd.get('title'),
+          location: fd.get('location'),
+          type: fd.get('type'),
+          experience_level: fd.get('experience_level') || 'Entry-level',
+          salary_min: parseInt(fd.get('salary_min')) || null,
+          salary_max: parseInt(fd.get('salary_max')) || null,
+          description: fd.get('description'),
+          requirements: fd.get('requirements') || '',
+          tags: (fd.get('tags') || '').split(',').map(t => t.trim()).filter(Boolean),
+          slots: parseInt(fd.get('slots')) || 1,
+          deadline: fd.get('deadline') || null,
+        });
+        toastSuccess('Job posted successfully');
+        form.reset();
+        updatePreview();
+        setTimeout(() => window.location.href = 'manage-jobs.html', 1000);
+      } catch (err) {
+        toastError(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Post Job';
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Settings</h1>
+        <div class="card mb-4">
+          <div class="card-body">
+            <h3 class="mb-3">Dark Mode</h3>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="dark-mode">
+              <label class="form-check-label" for="dark-mode">Enable dark mode</label>
+            </div>
+          </div>
+        </div>
+        <div class="card mb-4">
+          <div class="card-body">
+            <h3 class="mb-3">Change Password</h3>
+            <div class="form-group mb-2">
+              <label class="form-label">Current password</label>
+              <div class="pw-wrap">
+                <input type="password" class="form-input" id="curr-pw">
+                <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
+            <div class="form-group mb-2">
+              <label class="form-label">New password</label>
+              <div class="pw-wrap">
+                <input type="password" class="form-input" id="new-pw">
+                <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
+            <button id="change-pw" class="btn btn-primary">Change password</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script>
+    document.querySelectorAll('.pw-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = btn.closest('.pw-wrap').querySelector('input');
+        const icon  = btn.querySelector('i');
+        const show  = input.type === 'password';
+        input.type  = show ? 'text' : 'password';
+        icon.classList.toggle('bi-eye', !show);
+        icon.classList.toggle('bi-eye-slash', show);
+      });
+    });
+  </script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getTheme } from '../assets/js/store.js';
+    import { toggleDarkMode } from '../assets/js/app.js';
+    import { apiChangePassword } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+
+    renderLayout('seeker', 'Settings');
+
+    const dm = document.getElementById('dark-mode');
+    dm.checked = getTheme() === 'dark';
+    dm.onchange = () => {
+      toggleDarkMode();
+      dm.checked = document.documentElement.getAttribute('data-theme') === 'dark';
+    };
+
+    document.getElementById('change-pw').onclick = async () => {
+      const curr = document.getElementById('curr-pw').value.trim();
+      const newPw = document.getElementById('new-pw').value.trim();
+      if (!curr) { toastError('Enter your current password'); return; }
+      if (!newPw) { toastError('Enter a new password'); return; }
+      if (newPw.length < 6) { toastError('New password must be at least 6 characters'); return; }
+      if (curr === newPw) { toastError('New password must be different from current'); return; }
+      const btn = document.getElementById('change-pw');
+      btn.disabled = true;
+      try {
+        await apiChangePassword(curr, newPw);
+        document.getElementById('curr-pw').value = '';
+        document.getElementById('new-pw').value = '';
+        toastSuccess('Password updated successfully');
+      } catch (err) { toastError(err.message); }
+      finally { btn.disabled = false; }
+    };
+  </script>
+</body>
+</html>

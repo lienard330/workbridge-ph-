@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Review — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <a href="job-moderation.html" class="btn btn-ghost btn-sm mb-3"><i class="bi bi-arrow-left"></i> Back</a>
+        <div class="row">
+          <div class="col-lg-8">
+            <div id="job-content" class="card mb-4"><div class="card-body"><p class="text-secondary">Loading…</p></div></div>
+          </div>
+          <div class="col-lg-4">
+            <div class="card sticky-top" style="top:80px">
+              <div class="card-header"><h3 class="card-title mb-0">Moderation</h3></div>
+              <div class="card-body">
+                <textarea id="mod-reason" class="form-textarea mb-3" rows="2" placeholder="Reason (optional)"></textarea>
+                <button id="btn-approve" class="btn btn-success w-100 mb-2">Approve (Set Open)</button>
+                <button id="btn-reject" class="btn btn-danger w-100">Close / Takedown</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiGetJob, apiAdminApproveJob, apiAdminTakedownJob } from '../assets/js/api.js';
+    import { getQueryParams } from '../assets/js/router.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc } from '../assets/js/utils.js';
+
+    renderLayout('admin', 'Job Review');
+
+    const params = getQueryParams();
+    const el = document.getElementById('job-content');
+
+    if (!params.id) {
+      el.innerHTML = '<div class="card-body"><p>No job selected.</p></div>';
+    } else {
+      apiGetJob(params.id).then(job => {
+        const tags = (job.tags || []).map(t => `<span class="badge me-1">${esc(t.tag || t)}</span>`).join('');
+        el.innerHTML = `
+          <div class="card-header"><h2 class="card-title mb-0">${esc(job.title)}</h2></div>
+          <div class="card-body">
+            <p class="text-secondary">${esc(job.company?.name || '—')} · ${esc(job.location)}</p>
+            <p><span class="badge badge-${job.status === 'Open' ? 'verified' : 'pending'}">${esc(job.status)}</span></p>
+            ${tags ? `<div class="mb-3">${tags}</div>` : ''}
+            <h5>Description</h5>
+            <p>${esc(job.description || '')}</p>
+            ${job.requirements ? `<h5>Requirements</h5><p>${esc(job.requirements)}</p>` : ''}
+            <p class="text-muted small">Posted: ${new Date(job.created_at).toLocaleDateString()}</p>
+          </div>`;
+
+        document.getElementById('btn-approve').onclick = async () => {
+          const btn = document.getElementById('btn-approve');
+          btn.disabled = true;
+          try {
+            await apiAdminApproveJob(job.id);
+            toastSuccess('Job approved — status set to Open');
+            setTimeout(() => location.href = 'job-moderation.html', 800);
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+
+        document.getElementById('btn-reject').onclick = async () => {
+          if (!confirm('Close this job listing?')) return;
+          const btn = document.getElementById('btn-reject');
+          btn.disabled = true;
+          try {
+            await apiAdminTakedownJob(job.id);
+            toastSuccess('Job closed');
+            setTimeout(() => location.href = 'job-moderation.html', 800);
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+      }).catch(() => {
+        el.innerHTML = '<div class="card-body"><p class="text-danger">Job not found.</p></div>';
+      });
+    }
+  </script>
+</body>
+</html>

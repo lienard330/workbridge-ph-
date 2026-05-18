@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Applicant — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <div id="applicant-content"><p class="text-secondary">Loading…</p></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiGetApplication, apiUpdateApplicationStatus } from '../assets/js/api.js';
+    import { getQueryParams } from '../assets/js/router.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc } from '../assets/js/utils.js';
+
+    renderLayout('employer', 'Applicant Detail');
+
+    const params = getQueryParams();
+    const el = document.getElementById('applicant-content');
+
+    if (!params.id) {
+      el.innerHTML = '<div class="empty-state"><p>Not found.</p><a href="applicants.html" class="btn btn-ghost btn-sm">Back</a></div>';
+    } else {
+      apiGetApplication(params.id).then(app => {
+        const seeker = app.seeker;
+        const job = app.job_listing;
+        const name = seeker?.user?.name || 'Applicant';
+        const email = seeker?.user?.email || '-';
+        const skills = (seeker?.skills || []).map(s => s.skill || s).join(', ');
+
+        el.innerHTML = `
+          <a href="applicants.html" class="btn btn-ghost btn-sm mb-3"><i class="bi bi-arrow-left"></i> Back</a>
+          <div class="row">
+            <div class="col-lg-8">
+              <div class="card mb-4">
+                <div class="card-header"><h3>Applicant Info</h3></div>
+                <div class="card-body">
+                  <h4>${esc(name)}</h4>
+                  <p class="text-secondary">${esc(email)}</p>
+                  ${skills ? `<p><strong>Skills:</strong> ${esc(skills)}</p>` : ''}
+                  ${seeker?.headline ? `<p><em>${esc(seeker.headline)}</em></p>` : ''}
+                  ${app.cover_letter ? `<div class="mt-3"><strong>Cover Letter:</strong><p>${esc(app.cover_letter)}</p></div>` : ''}
+                  ${app.skill_fit != null ? `<p class="mt-2"><strong>Skill Fit:</strong> ${app.skill_fit}%</p>` : ''}
+                </div>
+              </div>
+              <div class="card mb-4">
+                <div class="card-header"><h3>Timeline</h3></div>
+                <div class="card-body">
+                  ${(app.timelines || []).map(t => `
+                    <div class="d-flex mb-3">
+                      <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width:36px;height:36px;flex-shrink:0">✓</div>
+                      <div>
+                        <strong>${esc(t.status)}</strong>
+                        <p class="text-secondary small mb-0">${new Date(t.created_at).toLocaleString()}${t.note ? ' · ' + esc(t.note) : ''}</p>
+                      </div>
+                    </div>`).join('')}
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="card mb-4">
+                <div class="card-header"><h3>Status</h3></div>
+                <div class="card-body">
+                  <span id="app-status" class="badge badge-${esc(app.status.toLowerCase())}">${esc(app.status)}</span>
+                  ${job ? `<p class="text-muted small mt-2">For: ${esc(job.title)}</p>` : ''}
+                  <div id="status-note-wrap" class="mt-3">
+                    <textarea id="status-note" class="form-textarea mb-2" rows="2" placeholder="Optional note..."></textarea>
+                  </div>
+                  <div class="d-flex flex-wrap gap-1 mt-2">
+                    <button class="btn btn-sm btn-secondary status-btn" data-s="Reviewing">Reviewing</button>
+                    <button class="btn btn-sm btn-primary status-btn" data-s="Interview">Interview</button>
+                    <button class="btn btn-sm btn-success status-btn" data-s="Hired">Hire</button>
+                    <button class="btn btn-sm btn-danger status-btn" data-s="Rejected">Reject</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+
+        el.querySelectorAll('.status-btn').forEach(btn => {
+          btn.onclick = async () => {
+            const note = document.getElementById('status-note').value.trim();
+            btn.disabled = true;
+            try {
+              await apiUpdateApplicationStatus(app.id, btn.dataset.s, note || null);
+              toastSuccess('Status updated to ' + btn.dataset.s);
+              document.getElementById('app-status').textContent = btn.dataset.s;
+              document.getElementById('app-status').className = 'badge badge-' + btn.dataset.s.toLowerCase();
+            } catch (err) { toastError(err.message); }
+            finally { btn.disabled = false; }
+          };
+        });
+      }).catch(() => {
+        el.innerHTML = '<div class="empty-state"><p>Applicant not found.</p><a href="applicants.html" class="btn btn-ghost btn-sm">Back</a></div>';
+      });
+    }
+  </script>
+</body>
+</html>

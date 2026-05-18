@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <div id="app-detail"><p class="text-secondary">Loading…</p></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiGetApplication } from '../assets/js/api.js';
+    import { getQueryParams } from '../assets/js/router.js';
+    import { esc } from '../assets/js/utils.js';
+
+    renderLayout('seeker', 'Application');
+
+    const params = getQueryParams();
+    const el = document.getElementById('app-detail');
+
+    if (!params.id) {
+      el.innerHTML = '<div class="empty-state"><p>Application not found.</p><a href="applications.html">Back to applications</a></div>';
+    } else {
+      apiGetApplication(params.id).then(app => {
+        const job = app.job_listing;
+        const title = job?.title || 'Job';
+        const companyName = job?.company?.name || 'Company';
+
+        el.innerHTML = `
+          <a href="applications.html" class="btn btn-ghost btn-sm mb-3"><i class="bi bi-arrow-left"></i> Back</a>
+          <div class="card mb-4">
+            <div class="card-body">
+              <h2 class="mb-2">${esc(title)}</h2>
+              <p class="text-secondary">${esc(companyName)}</p>
+              <span class="badge badge-${esc(app.status.toLowerCase())}">${esc(app.status)}</span>
+              ${app.skill_fit != null ? `<span class="ms-2 text-muted small">Skill fit: ${app.skill_fit}%</span>` : ''}
+            </div>
+          </div>
+          <div class="card mb-4">
+            <div class="card-header"><h3 class="card-title mb-0">Timeline</h3></div>
+            <div class="card-body">
+              <div class="timeline">
+                ${(app.timelines || []).map(t => `
+                  <div class="d-flex mb-3">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width:36px;height:36px;flex-shrink:0">✓</div>
+                    <div>
+                      <strong>${esc(t.status)}</strong>
+                      <p class="text-secondary small mb-0">${new Date(t.created_at).toLocaleString()}${t.note ? ' · ' + esc(t.note) : ''}</p>
+                    </div>
+                  </div>`).join('')}
+              </div>
+            </div>
+          </div>
+          ${app.cover_letter ? `<div class="card"><div class="card-header"><h3 class="card-title mb-0">Cover Letter</h3></div><div class="card-body"><p>${esc(app.cover_letter)}</p></div></div>` : ''}
+        `;
+      }).catch(() => {
+        el.innerHTML = '<div class="empty-state"><p>Application not found.</p><a href="applications.html" class="btn btn-primary mt-2">Back to applications</a></div>';
+      });
+    }
+  </script>
+</body>
+</html>

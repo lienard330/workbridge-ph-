@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/public.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Dashboard</h1>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4 col-12">
+            <div class="stat-card card">
+              <div class="stat-value" id="stat-saved">0</div>
+              <div class="stat-label">Saved Jobs</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-12">
+            <div class="stat-card card">
+              <div class="stat-value" id="stat-apps">0</div>
+              <div class="stat-label">Applications</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-12">
+            <div class="stat-card card">
+              <div class="stat-value" id="stat-profile">0%</div>
+              <div class="stat-label">Profile Strength</div>
+            </div>
+          </div>
+        </div>
+        <h3 class="mb-3">Recommended for you</h3>
+        <div id="recommended-jobs" class="jobs-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getRecommendedJobs, getSeekerStats } from '../assets/js/seeker.module.js';
+    import { getCurrentUser } from '../assets/js/store.js';
+    import { apiSavedJobs } from '../assets/js/api.js';
+    import { animateCounter } from '../assets/js/ui.animations.js';
+    import { esc, formatSalaryRange, companyAvatar, verifiedBadge, emptyState, skeletonJobCards } from '../assets/js/utils.js';
+
+    renderLayout('seeker', 'Dashboard');
+
+    const user = getCurrentUser();
+    if (user) {
+      const grid = document.getElementById('recommended-jobs');
+      grid.innerHTML = skeletonJobCards(6);
+
+      Promise.all([getSeekerStats(), apiSavedJobs(), getRecommendedJobs(6)]).then(([stats, savedRes, jobs]) => {
+        const savedCount = (savedRes.data || savedRes).length;
+
+        const s1 = document.getElementById('stat-saved');
+        const s2 = document.getElementById('stat-apps');
+        const s3 = document.getElementById('stat-profile');
+        if (s1) { s1.textContent = savedCount; animateCounter(s1, savedCount, 600); }
+        if (s2) { s2.textContent = stats.totalApplications; animateCounter(s2, stats.totalApplications, 600); }
+        if (s3) s3.textContent = stats.profileStrength + '%';
+
+        grid.innerHTML = jobs.length ? jobs.map(j => `
+          <div class="card card-lift">
+            <div class="card-body">
+              <div class="d-flex gap-2 align-items-start mb-2" style="min-width:0">
+                ${companyAvatar(j.company, 40)}
+                <div style="min-width:0">
+                  <a href="../job-detail.html?id=${esc(j.id)}" class="text-dark text-decoration-none"><h4 class="card-title mb-0">${esc(j.title)}</h4></a>
+                  <p class="text-secondary small mb-0">${esc(j.company?.name || 'Company')}${verifiedBadge(j.company)} · ${esc(j.location)}</p>
+                </div>
+              </div>
+              <p class="text-primary fw-bold mb-2">${formatSalaryRange(j.salaryMin, j.salaryMax)}</p>
+              <a href="../job-detail.html?id=${esc(j.id)}" class="btn btn-primary btn-sm">Apply</a>
+            </div>
+          </div>
+        `).join('') : emptyState({
+          icon: 'briefcase',
+          title: 'No jobs available',
+          subtitle: 'Check back soon — new opportunities are posted regularly.',
+          actionLabel: 'Browse all jobs',
+          actionHref: '../jobs.html',
+        });
+      }).catch(() => {
+        grid.innerHTML = '<p class="text-danger">Could not load data.</p>';
+      });
+    }
+  </script>
+</body>
+</html>

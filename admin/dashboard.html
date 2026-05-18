@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+  <link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Admin Dashboard</h1>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4 col-12">
+            <a href="employer-verification.html" class="text-decoration-none text-dark">
+              <div class="stat-card card">
+                <div class="stat-value" id="pending-verify">0</div>
+                <div class="stat-label">Pending Employer Verifications</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-4 col-12">
+            <a href="job-moderation.html" class="text-decoration-none text-dark">
+              <div class="stat-card card">
+                <div class="stat-value" id="pending-jobs">0</div>
+                <div class="stat-label">Pending Job Reviews</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-4 col-12">
+            <a href="reports.html" class="text-decoration-none text-dark">
+              <div class="stat-card card">
+                <div class="stat-value" id="open-reports">0</div>
+                <div class="stat-label">Open Reports</div>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title mb-0">Quick Actions</h3></div>
+          <div class="card-body">
+            <a href="employer-verification.html" class="btn btn-primary me-2">Employer Verification</a>
+            <a href="job-moderation.html" class="btn btn-secondary me-2">Job Moderation</a>
+            <a href="reports.html" class="btn btn-secondary me-2">Reports</a>
+            <a href="analytics.html" class="btn btn-secondary">Analytics</a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getDashboardStats, getPendingVerifications, getOpenReports } from '../assets/js/admin.module.js';
+
+    renderLayout('admin', 'Dashboard');
+
+    Promise.all([getDashboardStats(), getPendingVerifications(), getOpenReports()]).then(([stats, pendingVerif, openReports]) => {
+      const pv = document.getElementById('pending-verify');
+      const pj = document.getElementById('pending-jobs');
+      const or = document.getElementById('open-reports');
+      if (pv) pv.textContent = stats.pending_verif ?? pendingVerif.length;
+      if (pj) pj.textContent = stats.total_jobs ?? 0;
+      if (or) or.textContent = stats.open_reports ?? openReports.length;
+
+      // Extra stats if elements exist
+      const tu = document.getElementById('total-users');
+      const tj = document.getElementById('total-jobs');
+      if (tu) tu.textContent = stats.total_users ?? '—';
+      if (tj) tj.textContent = stats.total_jobs ?? '—';
+    }).catch(() => {});
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "employment",
+  "version": "1.0.0",
+  "description": "Web-Based Unified Employment Platform for Decent Work Access (Philippines)",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:e2e": "playwright test",
+    "serve": "npx --yes serve . -l 3000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

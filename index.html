@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorkBridge PH — Decent Work for Every Filipino</title>
+  <link rel="icon" type="image/png" href="assets/img/logo.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/public.css">
+</head>
+<body>
+  <header class="public-nav">
+    <div class="public-nav-inner">
+      <a href="index.html" class="public-nav-brand"><img src="assets/img/logo.png" alt="" class="public-nav-logo"><span>WorkBridge PH</span></a>
+      <ul class="public-nav-links">
+        <li><a href="jobs.html">Jobs</a></li>
+        <li><a href="categories.html">Categories</a></li>
+        <li><a href="companies.html">Companies</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="help.html">Help</a></li>
+        <li><a href="auth/login.html" class="btn btn-primary">Log in</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container page-transition">
+    <section class="hero">
+      <h1 class="hero-title">Decent Work for Everyone, Everywhere</h1>
+      <p class="hero-subtitle">Connect with employers worldwide. Find opportunities that match your skills and aspirations.</p>
+      <form class="hero-search" action="jobs.html" method="get">
+        <input type="text" name="keyword" placeholder="Job title or keyword">
+        <input type="text" name="location" placeholder="Location (e.g. Manila)">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+      </form>
+    </section>
+
+    <section class="mb-5">
+      <div class="d-flex justify-content-between align-items-end mb-3">
+        <h2 class="mb-0">Browse by Category</h2>
+        <a href="categories.html" class="text-primary small">View all <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="categories-grid" id="home-categories">
+        <a href="categories.html" class="category-card">Loading…</a>
+      </div>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="mb-3">Featured Jobs</h2>
+      <div id="featured-jobs" class="jobs-grid"></div>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="mb-3">How It Works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h4>Create Profile</h4>
+          <p class="text-secondary">Sign up and build your profile</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h4>Browse Jobs</h4>
+          <p class="text-secondary">Find opportunities that fit</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h4>Apply & Connect</h4>
+          <p class="text-secondary">Apply and get hired</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>© 2026 WorkBridge PH</span>
+      <div class="footer-links">
+        <a href="safety.html">Safety</a>
+        <a href="terms.html">Terms</a>
+        <a href="privacy.html">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="assets/js/app.js"></script>
+  <script type="module">
+    import { getJobsWithCompanies } from './assets/js/jobs.module.js';
+    import { apiGetCategories } from './assets/js/api.js';
+    import { esc, formatSalaryRange, companyAvatar, verifiedBadge, skeletonJobCards } from './assets/js/utils.js';
+
+    // Populate the category tiles from real API data instead of hardcoded labels.
+    // Top 6 categories by job count, fallback to first 6 if counts aren't returned.
+    apiGetCategories().then(res => {
+      const cats = (res.data || res).slice().sort((a, b) =>
+        (b.job_listings_count || 0) - (a.job_listings_count || 0)
+      ).slice(0, 6);
+      const grid = document.getElementById('home-categories');
+      if (!cats.length) { grid.innerHTML = '<a href="categories.html" class="category-card">View all categories</a>'; return; }
+      grid.innerHTML = cats.map(c =>
+        `<a href="jobs.html?category=${esc(String(c.id))}" class="category-card">${esc(c.name)}</a>`
+      ).join('');
+    }).catch(() => {
+      // If the API is down, gracefully degrade to a single fallback link.
+      document.getElementById('home-categories').innerHTML =
+        '<a href="categories.html" class="category-card">View all categories</a>';
+    });
+
+    const grid = document.getElementById('featured-jobs');
+    grid.innerHTML = skeletonJobCards(6);
+
+    getJobsWithCompanies({}).then(({ jobs }) => {
+      const featured = jobs.slice(0, 6);
+      if (!featured.length) { grid.innerHTML = '<p class="text-secondary">No jobs available.</p>'; return; }
+      grid.innerHTML = featured.map(j => `
+        <a href="job-detail.html?id=${esc(j.id)}" class="job-card text-decoration-none text-dark">
+          <div class="d-flex gap-3 align-items-start mb-2" style="min-width:0">
+            ${companyAvatar(j.company, 44)}
+            <div style="min-width:0">
+              <h3 class="job-card-title mb-1">${esc(j.title)}</h3>
+              <p class="job-card-company mb-0">${esc(j.company?.name || 'Company')}${verifiedBadge(j.company)}</p>
+            </div>
+          </div>
+          <div class="job-card-meta">
+            <span><i class="bi bi-geo-alt"></i> ${esc(j.location)}</span>
+            <span><i class="bi bi-briefcase"></i> ${esc(j.type)}</span>
+          </div>
+          <p class="job-card-salary">${formatSalaryRange(j.salaryMin, j.salaryMax)}</p>
+        </a>
+      `).join('');
+    }).catch(() => {
+      grid.innerHTML = '<p class="text-danger">Could not load jobs. Make sure the backend server is running.</p>';
+    });
+  </script>
+</body>
+</html>

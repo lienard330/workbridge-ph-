@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Messages</h1>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card" style="min-height:400px">
+              <div class="card-body p-0">
+                <div style="padding:var(--space-md);border-bottom:1px solid var(--color-border)">
+                  <input type="text" id="search-contacts" class="form-input" placeholder="Search conversations...">
+                </div>
+                <div id="contact-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <div class="card" style="min-height:400px;display:flex;flex-direction:column">
+              <div id="chat-header" style="padding:var(--space-md);border-bottom:1px solid var(--color-border);font-weight:600"></div>
+              <div id="chat-messages" style="flex:1;padding:var(--space-md);overflow-y:auto;max-height:300px"></div>
+              <div id="chat-input-wrap" style="padding:var(--space-md);border-top:1px solid var(--color-border);display:none">
+                <div class="d-flex gap-2">
+                  <input type="text" id="chat-input" class="form-input" placeholder="Type a message...">
+                  <button id="send-btn" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getCurrentUser } from '../assets/js/store.js';
+    import { apiGetContacts, apiGetThread, apiSendMessage } from '../assets/js/api.js';
+    import { toastError } from '../assets/js/ui.toast.js';
+    import { esc, emptyState } from '../assets/js/utils.js';
+
+    renderLayout('seeker', 'Messages');
+
+    const user = getCurrentUser();
+    let contacts = [];
+    let activeContact = null;
+    let thread = [];
+
+    async function loadContacts() {
+      try {
+        const res = await apiGetContacts();
+        contacts = res.data || res;
+        renderContacts();
+      } catch (err) {
+        document.getElementById('contact-list').innerHTML = `<p class="text-danger p-3">${esc(err.message)}</p>`;
+      }
+    }
+
+    function renderContacts() {
+      const q = (document.getElementById('search-contacts').value || '').toLowerCase();
+      const contactList = document.getElementById('contact-list');
+      const filtered = contacts.filter(c => {
+        const name = c.name || c.company?.name || '';
+        return !q || name.toLowerCase().includes(q);
+      });
+
+      if (!filtered.length) {
+        contactList.innerHTML = emptyState({
+          icon: 'chat-dots',
+          title: 'No conversations yet',
+          subtitle: 'Messages from employers will appear here.',
+        });
+        return;
+      }
+
+      contactList.innerHTML = filtered.map(c => {
+        const name = c.name || 'Unknown';
+        const isActive = activeContact?.id === c.id;
+        return `<div class="msg-contact${isActive ? ' msg-contact-active' : ''}" data-id="${esc(String(c.id))}" style="padding:var(--space-md);border-bottom:1px solid var(--color-border-subtle);cursor:pointer;${isActive ? 'background:var(--color-accent-muted)' : ''}">
+          <div class="fw-bold">${esc(name)}</div>
+          <div class="text-muted small text-truncate">${c.last_message ? esc(c.last_message) : 'No messages'}</div>
+        </div>`;
+      }).join('');
+
+      contactList.querySelectorAll('.msg-contact').forEach(el => {
+        el.onclick = () => {
+          activeContact = contacts.find(c => String(c.id) === el.dataset.id);
+          renderContacts();
+          loadThread();
+        };
+      });
+    }
+
+    async function loadThread() {
+      if (!activeContact) return;
+      const header = document.getElementById('chat-header');
+      const messagesEl = document.getElementById('chat-messages');
+      const inputWrap = document.getElementById('chat-input-wrap');
+
+      header.textContent = activeContact.name || 'Unknown';
+      inputWrap.style.display = 'block';
+      messagesEl.innerHTML = '<p class="text-secondary">Loading…</p>';
+
+      try {
+        const res = await apiGetThread(activeContact.id);
+        thread = res.data || res;
+        renderThread();
+      } catch (err) {
+        messagesEl.innerHTML = `<p class="text-danger">${esc(err.message)}</p>`;
+      }
+    }
+
+    function renderThread() {
+      const messagesEl = document.getElementById('chat-messages');
+      if (!thread.length) {
+        messagesEl.innerHTML = '<div class="text-muted text-center py-4">No messages in this conversation yet.</div>';
+        return;
+      }
+      messagesEl.innerHTML = thread.map(m => {
+        const isMine = m.sender_id === user?.id;
+        return `<div style="margin-bottom:var(--space-sm);text-align:${isMine ? 'right' : 'left'}">
+          <div style="display:inline-block;max-width:75%;padding:var(--space-sm) var(--space-md);border-radius:var(--radius-md);background:${isMine ? 'var(--color-accent)' : 'var(--color-bg-elevated)'};color:${isMine ? 'white' : 'var(--color-text)'}">
+            ${esc(m.body)}
+          </div>
+          <div class="text-muted" style="font-size:var(--text-xs)">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+        </div>`;
+      }).join('');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text || !activeContact) return;
+      input.value = '';
+      try {
+        const msg = await apiSendMessage(activeContact.id, text);
+        thread.push(msg);
+        renderThread();
+      } catch (err) { toastError(err.message); input.value = text; }
+    }
+
+    document.getElementById('send-btn').onclick = sendMessage;
+    document.getElementById('chat-input').onkeydown = e => { if (e.key === 'Enter') sendMessage(); };
+    document.getElementById('search-contacts').oninput = renderContacts;
+
+    // Initial empty state
+    document.getElementById('chat-messages').innerHTML = emptyState({
+      icon: 'chat-left-text',
+      title: 'Select a conversation',
+      subtitle: 'Pick a contact on the left to view your messages.',
+    });
+
+    loadContacts();
+  </script>
+</body>
+</html>

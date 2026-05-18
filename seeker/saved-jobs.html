@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saved Jobs — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/public.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Saved Jobs</h1>
+        <div id="saved-list" class="jobs-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiSavedJobs, apiUnsaveJob } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc, formatSalaryRange, companyAvatar, verifiedBadge, emptyState } from '../assets/js/utils.js';
+
+    renderLayout('seeker', 'Saved Jobs');
+
+    const list = document.getElementById('saved-list');
+    list.innerHTML = '<p class="text-secondary">Loading…</p>';
+
+    async function render() {
+      try {
+        const res = await apiSavedJobs();
+        const saved = res.data || res;
+        if (!saved.length) {
+          // Override the .jobs-grid display so the empty state takes the full width.
+          // Otherwise it gets cramped into a single grid column.
+          list.style.display = 'block';
+          list.innerHTML = emptyState({
+            icon: 'bookmark',
+            title: 'No saved jobs yet',
+            subtitle: 'Save jobs you\'re interested in and find them here later.',
+            actionLabel: 'Browse jobs',
+            actionHref: '../jobs.html',
+          });
+          return;
+        }
+        // Restore grid display when we have saved jobs to show
+        list.style.display = '';
+        list.innerHTML = saved.map(s => {
+          const j = s.job_listing;
+          if (!j) return '';
+          return `
+            <div class="card card-lift">
+              <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                  <div class="d-flex gap-2 align-items-start" style="min-width:0;flex:1">
+                    ${companyAvatar(j.company, 40)}
+                    <div style="min-width:0">
+                      <a href="../job-detail.html?id=${esc(j.id)}" class="text-dark text-decoration-none"><h4 class="card-title mb-0">${esc(j.title)}</h4></a>
+                      <p class="text-secondary small mb-0">${esc(j.company?.name || 'Company')}${verifiedBadge(j.company)}</p>
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm remove-saved flex-shrink-0" data-id="${esc(j.id)}"><i class="bi bi-bookmark-fill text-warning"></i></button>
+                </div>
+                <p class="text-primary fw-bold">${formatSalaryRange(j.salary_min, j.salary_max)}</p>
+                <a href="../job-detail.html?id=${esc(j.id)}" class="btn btn-primary btn-sm">View & Apply</a>
+              </div>
+            </div>`;
+        }).filter(Boolean).join('');
+
+        list.querySelectorAll('.remove-saved').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            try {
+              await apiUnsaveJob(btn.dataset.id);
+              toastSuccess('Removed from saved');
+              render();
+            } catch (err) { toastError(err.message); }
+          });
+        });
+      } catch (err) {
+        list.innerHTML = `<p class="text-danger">${esc(err.message)}</p>`;
+      }
+    }
+    render();
+  </script>
+</body>
+</html>

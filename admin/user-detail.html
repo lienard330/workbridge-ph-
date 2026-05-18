@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Detail — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <a href="users.html" class="btn btn-ghost btn-sm mb-3"><i class="bi bi-arrow-left"></i> Back</a>
+        <div id="user-detail" class="card"><div class="card-body"><p class="text-secondary">Loading…</p></div></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiAdminUsers, apiAdminBanUser, apiAdminUnbanUser } from '../assets/js/api.js';
+    import { getQueryParams } from '../assets/js/router.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc } from '../assets/js/utils.js';
+
+    renderLayout('admin', 'User Detail');
+
+    const params = getQueryParams();
+    const el = document.getElementById('user-detail');
+
+    if (!params.id) {
+      el.innerHTML = '<div class="card-body"><p>Not found.</p></div>';
+    } else {
+      apiAdminUsers({ search: '' }).then(res => {
+        const users = res.data || res;
+        const u = users.find(x => String(x.id) === params.id);
+
+        if (!u) {
+          el.innerHTML = '<div class="card-body"><p>User not found. They may be on a different page.</p></div>';
+          return;
+        }
+
+        const isBanned = u.status === 'banned';
+        el.innerHTML = `
+          <div class="card-body">
+            <h2>${esc(u.name || '—')}</h2>
+            <p><strong>Email:</strong> ${esc(u.email)}</p>
+            <p><strong>Role:</strong> <span class="badge">${esc(u.role)}</span></p>
+            <p><strong>Status:</strong> <span id="user-status" class="badge badge-${isBanned ? 'rejected' : 'verified'}">${esc(u.status)}</span></p>
+            <p><strong>Joined:</strong> ${new Date(u.created_at).toLocaleDateString()}</p>
+            <div class="mt-4 d-flex gap-2">
+              <button id="btn-unban" class="btn btn-success" ${!isBanned ? 'disabled' : ''}>Unban</button>
+              <button id="btn-ban" class="btn btn-danger" ${isBanned || u.role === 'admin' ? 'disabled' : ''}>Ban</button>
+            </div>
+          </div>`;
+
+        document.getElementById('btn-ban').onclick = async () => {
+          const btn = document.getElementById('btn-ban');
+          btn.disabled = true;
+          try {
+            await apiAdminBanUser(u.id);
+            toastSuccess('User banned');
+            document.getElementById('user-status').textContent = 'banned';
+            document.getElementById('user-status').className = 'badge badge-rejected';
+            document.getElementById('btn-unban').disabled = false;
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+
+        document.getElementById('btn-unban').onclick = async () => {
+          const btn = document.getElementById('btn-unban');
+          btn.disabled = true;
+          try {
+            await apiAdminUnbanUser(u.id);
+            toastSuccess('User unbanned');
+            document.getElementById('user-status').textContent = 'active';
+            document.getElementById('user-status').className = 'badge badge-verified';
+            document.getElementById('btn-ban').disabled = u.role === 'admin';
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+      }).catch(err => {
+        el.innerHTML = `<div class="card-body"><p class="text-danger">${esc(err.message)}</p></div>`;
+      });
+    }
+  </script>
+</body>
+</html>

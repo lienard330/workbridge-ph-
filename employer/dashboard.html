@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Dashboard</h1>
+
+        <!-- Top-line counters -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3 col-6">
+            <a href="manage-jobs.html" class="text-decoration-none text-dark">
+              <div class="stat-card card">
+                <div class="stat-value" id="stat-jobs">—</div>
+                <div class="stat-label">Active Jobs</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-3 col-6">
+            <a href="applicants.html" class="text-decoration-none text-dark">
+              <div class="stat-card card">
+                <div class="stat-value" id="stat-apps">—</div>
+                <div class="stat-label">Total Applicants</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="stat-card card">
+              <div class="stat-value" id="stat-short">—</div>
+              <div class="stat-label">Shortlisted</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="stat-card card">
+              <div class="stat-value" id="stat-hires">—</div>
+              <div class="stat-label">Hires</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 1: pipeline donut + jobs status bar -->
+        <div class="row g-3 mb-4">
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header"><h3 class="card-title mb-0">Applications Pipeline</h3></div>
+              <div class="card-body">
+                <div style="position:relative;height:280px"><canvas id="chart-apps-status"></canvas></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header"><h3 class="card-title mb-0">My Jobs by Status</h3></div>
+              <div class="card-body">
+                <div style="position:relative;height:280px"><canvas id="chart-jobs-status"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: top jobs + 30-day trend -->
+        <div class="row g-3 mb-4">
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header"><h3 class="card-title mb-0">Top Performing Jobs</h3></div>
+              <div class="card-body">
+                <div style="position:relative;height:280px"><canvas id="chart-top-jobs"></canvas></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="card h-100">
+              <div class="card-header"><h3 class="card-title mb-0">Applications · Last 30 Days</h3></div>
+              <div class="card-body">
+                <div style="position:relative;height:280px"><canvas id="chart-apps-trend"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Chart.js — same CDN as admin analytics, browser caches the second load -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiEmployerDashboard } from '../assets/js/api.js';
+
+    renderLayout('employer', 'Dashboard');
+
+    // Same brand palette used by admin analytics — keeps the visual language consistent
+    // across roles. If we ever theme the app, both pages update from one source.
+    const PALETTE = {
+      primary: '#4F46E5',
+      teal:    '#0D9488',
+      amber:   '#F59E0B',
+      rose:    '#E11D48',
+      slate:   '#64748B',
+      emerald: '#10B981',
+      sky:     '#0EA5E9',
+      violet:  '#8B5CF6',
+    };
+
+    function donut(ctx, labels, data, colors) {
+      return new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12, font: { size: 12 } } },
+            tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed}` } },
+          },
+        },
+      });
+    }
+
+    function bar(ctx, labels, data, colors, horizontal = false) {
+      return new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderWidth: 0 }] },
+        options: {
+          indexAxis: horizontal ? 'y' : 'x',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            [horizontal ? 'x' : 'y']: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            [horizontal ? 'y' : 'x']: { grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    function line(ctx, labels, data) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            borderColor: PALETTE.primary,
+            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } },
+          },
+        },
+      });
+    }
+
+    /**
+     * Build a dense 30-day series from a sparse {date: count} object.
+     * The backend only returns days that had applications; we fill in zeros
+     * so the line chart shows a continuous timeline instead of skipping days.
+     */
+    function fill30Days(sparse) {
+      const labels = [];
+      const data = [];
+      const today = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        data.push(sparse[key] || 0);
+      }
+      return { labels, data };
+    }
+
+    apiEmployerDashboard().then(d => {
+      // Top-line counters
+      document.getElementById('stat-jobs').textContent  = d.totals.active_jobs ?? 0;
+      document.getElementById('stat-apps').textContent  = d.totals.total_applicants ?? 0;
+      document.getElementById('stat-short').textContent = d.totals.shortlisted ?? 0;
+      document.getElementById('stat-hires').textContent = d.totals.hires ?? 0;
+
+      // Applications pipeline — donut, status order matches lifecycle progression
+      const apps = d.applications_by_status || {};
+      donut(
+        document.getElementById('chart-apps-status'),
+        ['Pending', 'Reviewing', 'Interview', 'Hired', 'Rejected'],
+        [apps.Pending || 0, apps.Reviewing || 0, apps.Interview || 0, apps.Hired || 0, apps.Rejected || 0],
+        [PALETTE.amber, PALETTE.sky, PALETTE.violet, PALETTE.emerald, PALETTE.rose]
+      );
+
+      // Jobs by status — bar
+      const jobs = d.jobs_by_status || {};
+      bar(
+        document.getElementById('chart-jobs-status'),
+        ['Open', 'Draft', 'Closed'],
+        [jobs.Open || 0, jobs.Draft || 0, jobs.Closed || 0],
+        [PALETTE.teal, PALETTE.amber, PALETTE.slate]
+      );
+
+      // Top jobs — horizontal bar (long titles read better horizontally)
+      const top = d.top_jobs || [];
+      if (top.length) {
+        bar(
+          document.getElementById('chart-top-jobs'),
+          top.map(j => j.title.length > 28 ? j.title.slice(0, 27) + '…' : j.title),
+          top.map(j => j.applications_count),
+          top.map(() => PALETTE.primary),
+          true /* horizontal */
+        );
+      } else {
+        const el = document.getElementById('chart-top-jobs').parentElement;
+        el.innerHTML = '<div class="d-flex h-100 align-items-center justify-content-center text-secondary">Post a job to start tracking applications.</div>';
+      }
+
+      // Applications trend — 30-day line, fill in missing days with zero
+      const { labels, data } = fill30Days(d.applications_last_30_days || {});
+      line(document.getElementById('chart-apps-trend'), labels, data);
+    }).catch(err => {
+      console.error('Employer dashboard load failed', err);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php --version)",
+      "Bash(composer --version)",
+      "Bash(npm --version)",
+      "Bash(composer install *)",
+      "Bash(cp .env.example .env)",
+      "Bash(php artisan *)",
+      "Bash(touch *)",
+      "Bash(icacls C:\\\\Users\\\\Asus\\\\Downloads\\\\workbridge-ph-main\\\\backend\\\\bootstrap\\\\cache *)",
+      "Bash(chmod 777 C:/Users/Asus/Downloads/workbridge-ph-main/backend/bootstrap/cache)",
+      "Bash(echo \"test\")",
+      "Bash(rm C:/Users/Asus/Downloads/workbridge-ph-main/backend/bootstrap/cache/test.txt)",
+      "Bash(npm install *)",
+      "Bash(composer run *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(netsh int *)",
+      "Bash(php -S 127.0.0.1:8080)",
+      "Bash(curl -s http://127.0.0.1:8080/api/jobs)",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://127.0.0.1:8080/api/categories)",
+      "Bash(curl -s http://127.0.0.1:8080/api/companies)",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{\"email\":\"juan@example.com\",\"password\":\"password\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8080/api/auth/me -H \"Accept: application/json\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8080/api/seeker/profile -H \"Accept: application/json\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8080/api/admin/dashboard -H \"Accept: application/json\")",
+      "Bash(curl -s -I \"http://127.0.0.1:8080/api/jobs\" -H \"Origin: http://localhost:62819\")",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{\"email\":\"bad-email\",\"password\":\"123\",\"role\":\"seeker\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8080/api/jobs -H \"Accept: application/json\")",
+      "Bash(curl -s http://127.0.0.1:8080/api/jobs -H \"Accept: application/json\")",
+      "Bash(php -S 127.0.0.1:8080 server.php)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Total jobs: {d[\\\\\"total\\\\\"]}'\\); [print\\(f'  - {j[\\\\\"title\\\\\"]} @ {j[\\\\\"company\\\\\"][\\\\\"name\\\\\"]}'\\) for j in d['data']]\")",
+      "Bash(gh --version)",
+      "Bash(git --version)"
+    ]
+  }
+}

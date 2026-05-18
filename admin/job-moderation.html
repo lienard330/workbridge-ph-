@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Moderation — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Job Moderation</h1>
+        <div class="card mb-4">
+          <div class="card-body">
+            <select id="f-status" class="form-select d-inline-block me-2" style="max-width:140px">
+              <option value="">All Status</option>
+              <option value="Open">Open</option>
+              <option value="Draft">Draft</option>
+              <option value="Closed">Closed</option>
+            </select>
+            <input type="text" id="f-search" class="form-input d-inline-block" placeholder="Search title or company…" style="max-width:220px">
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Job Title</th><th>Company</th><th>Status</th><th>Posted</th><th>Actions</th></tr></thead>
+              <tbody id="mod-tbody"><tr><td colspan="5" class="text-secondary">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiAdminAllJobs, apiAdminApproveJob, apiAdminTakedownJob } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc, skeletonTableRows } from '../assets/js/utils.js';
+
+    renderLayout('admin', 'Job Moderation');
+    document.getElementById('mod-tbody').innerHTML = skeletonTableRows(5, 5);
+
+    let allJobs = [];
+
+    function render() {
+      const status = document.getElementById('f-status').value;
+      const q = (document.getElementById('f-search').value || '').toLowerCase();
+      let list = allJobs;
+      if (status) list = list.filter(j => j.status === status);
+      if (q) list = list.filter(j => (j.title + ' ' + (j.company?.name || '')).toLowerCase().includes(q));
+
+      const tbody = document.getElementById('mod-tbody');
+      if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-secondary">No jobs found.</td></tr>'; return; }
+
+      tbody.innerHTML = list.map(j => {
+        const badgeCls = j.status === 'Open' ? 'verified' : j.status === 'Draft' ? 'pending' : 'rejected';
+        return `<tr>
+          <td><a href="job-review.html?id=${esc(String(j.id))}" class="text-dark">${esc(j.title)}</a></td>
+          <td>${esc(j.company?.name || '—')}</td>
+          <td><span class="badge badge-${badgeCls}">${esc(j.status)}</span></td>
+          <td>${new Date(j.created_at).toLocaleDateString()}</td>
+          <td>
+            <a href="job-review.html?id=${esc(String(j.id))}" class="btn btn-ghost btn-sm me-1">Review</a>
+            ${j.status !== 'Open' ? `<button class="btn btn-success btn-sm me-1 approve-btn" data-id="${esc(String(j.id))}">Approve</button>` : ''}
+            ${j.status !== 'Closed' ? `<button class="btn btn-danger btn-sm takedown-btn" data-id="${esc(String(j.id))}">Close</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('');
+
+      tbody.querySelectorAll('.approve-btn').forEach(btn => {
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            await apiAdminApproveJob(btn.dataset.id);
+            toastSuccess('Job approved');
+            const job = allJobs.find(j => String(j.id) === btn.dataset.id);
+            if (job) job.status = 'Open';
+            render();
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+      });
+
+      tbody.querySelectorAll('.takedown-btn').forEach(btn => {
+        btn.onclick = async () => {
+          if (!confirm('Close this job listing?')) return;
+          btn.disabled = true;
+          try {
+            await apiAdminTakedownJob(btn.dataset.id);
+            toastSuccess('Job closed');
+            const job = allJobs.find(j => String(j.id) === btn.dataset.id);
+            if (job) job.status = 'Closed';
+            render();
+          } catch (err) { toastError(err.message); btn.disabled = false; }
+        };
+      });
+    }
+
+    document.getElementById('f-status').onchange = render;
+    document.getElementById('f-search').oninput = render;
+
+    apiAdminAllJobs().then(res => { allJobs = res.data || res; render(); })
+      .catch(err => { document.getElementById('mod-tbody').innerHTML = `<tr><td colspan="5" class="text-danger">${esc(err.message)}</td></tr>`; });
+  </script>
+</body>
+</html>

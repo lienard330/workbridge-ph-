@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Profile</h1>
+
+        <div class="card mb-4">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+              <h3 class="mb-0">Profile Strength</h3>
+              <span class="badge badge-teal" id="profile-strength">—</span>
+            </div>
+
+            <!-- Avatar + upload section -->
+            <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+              <div id="avatar-wrap" style="position:relative;flex-shrink:0">
+                <!-- Filled by render() — either an <img> if photo exists, or a colored initials block -->
+              </div>
+              <div style="min-width:0;flex:1">
+                <p class="mb-1 fw-bold" id="profile-name-inline">—</p>
+                <p class="text-secondary small mb-2" id="profile-headline">—</p>
+                <input type="file" id="photo-input" accept="image/png,image/jpeg,image/webp" hidden>
+                <button class="btn btn-secondary btn-sm" id="photo-btn">
+                  <i class="bi bi-camera"></i> <span id="photo-btn-label">Change Photo</span>
+                </button>
+                <p class="text-muted small mt-1 mb-0">JPG, PNG, or WEBP — max 2MB.</p>
+              </div>
+            </div>
+
+            <hr>
+
+            <div class="mb-3">
+              <label class="form-label text-secondary small mb-1">Name</label>
+              <p class="mb-0" id="profile-name">—</p>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small mb-1">Location</label>
+              <p class="mb-0" id="profile-location">—</p>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small mb-1">Bio</label>
+              <p class="mb-0" id="profile-bio">—</p>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small mb-1">Skills</label>
+              <p class="mb-0" id="profile-skills">—</p>
+            </div>
+
+            <button class="btn btn-primary" id="edit-btn">Edit Profile</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { getCurrentUser } from '../assets/js/store.js';
+    import { apiSeekerProfile, apiUpdateSeekerProfile, apiUploadPhoto, storageUrl } from '../assets/js/api.js';
+    import { openModal } from '../assets/js/ui.modal.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc, companyAvatar } from '../assets/js/utils.js';
+
+    renderLayout('seeker', 'Profile');
+
+    const user = getCurrentUser();
+    let profile = null;
+
+    function render() {
+      const skills = (profile?.skills || []).map(s => s.skill || s);
+
+      document.getElementById('profile-name').textContent     = user?.name || '—';
+      document.getElementById('profile-name-inline').textContent = user?.name || '—';
+      document.getElementById('profile-headline').textContent = profile?.headline || 'Add a headline to stand out';
+      document.getElementById('profile-location').textContent = profile?.location || '—';
+      document.getElementById('profile-bio').textContent      = profile?.bio || '—';
+      document.getElementById('profile-skills').textContent   = skills.length ? skills.join(', ') : '—';
+      document.getElementById('profile-strength').textContent = (profile?.profile_strength || 0) + '%';
+
+      // Avatar: real photo if uploaded, otherwise initials block (re-using the company avatar
+      // helper since the visual is identical — colored circle with initials).
+      const wrap = document.getElementById('avatar-wrap');
+      const photoUrl = profile?.profile_photo ? storageUrl(profile.profile_photo) : null;
+      if (photoUrl) {
+        wrap.innerHTML = `<img src="${esc(photoUrl)}" alt="Profile photo"
+          style="width:88px;height:88px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)">`;
+      } else {
+        // Fake-shape a "company" object so companyAvatar renders initials based on user name
+        wrap.innerHTML = companyAvatar({ name: user?.name || 'You' }, 88).replace(
+          'border-radius:17.6px',  // companyAvatar computes radius = size/5
+          'border-radius:50%'      // override to a circle for human profile photos
+        );
+      }
+
+      // If a previous upload finished, update the topbar greeting/avatar too (next page load picks up DB)
+    }
+
+    /* --- Photo upload --- */
+    document.getElementById('photo-btn').addEventListener('click', () => {
+      document.getElementById('photo-input').click();
+    });
+
+    document.getElementById('photo-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Client-side guard: 2MB cap matches the backend validator
+      if (file.size > 2 * 1024 * 1024) {
+        toastError('Photo must be 2MB or smaller.');
+        e.target.value = '';
+        return;
+      }
+
+      const btn = document.getElementById('photo-btn');
+      const label = document.getElementById('photo-btn-label');
+      btn.disabled = true;
+      label.textContent = 'Uploading…';
+
+      try {
+        const res = await apiUploadPhoto(file);
+        // Update local profile state and re-render — no page reload needed
+        if (profile) profile.profile_photo = res.profile_photo;
+        else profile = { profile_photo: res.profile_photo };
+        render();
+        toastSuccess('Photo updated');
+      } catch (err) {
+        toastError(err.message);
+      } finally {
+        btn.disabled = false;
+        label.textContent = 'Change Photo';
+        e.target.value = '';  // allows re-selecting the same file later
+      }
+    });
+
+    /* --- Edit profile (existing flow) --- */
+    document.getElementById('edit-btn').addEventListener('click', () => {
+      const skills = (profile?.skills || []).map(s => s.skill || s).join(', ');
+      openModal({
+        title: 'Edit Profile',
+        body: `<div class="form-group"><label class="form-label">Headline</label><input type="text" id="edit-headline" class="form-input" value="${esc(profile?.headline || '')}"></div>
+               <div class="form-group"><label class="form-label">Location</label><input type="text" id="edit-location" class="form-input" value="${esc(profile?.location || '')}"></div>
+               <div class="form-group"><label class="form-label">Bio</label><textarea id="edit-bio" class="form-input" rows="3">${esc(profile?.bio || '')}</textarea></div>
+               <div class="form-group"><label class="form-label">Skills (comma-separated)</label><input type="text" id="edit-skills" class="form-input" value="${esc(skills)}"></div>`,
+        footer: '<button class="btn btn-secondary" id="modal-cancel">Cancel</button> <button class="btn btn-primary" id="save-profile">Save</button>',
+      });
+      document.getElementById('modal-cancel')?.addEventListener('click', () => document.querySelector('.wb-modal-backdrop')?.remove());
+      document.getElementById('save-profile').onclick = async () => {
+        const skillArr = document.getElementById('edit-skills').value.split(',').map(s => s.trim()).filter(Boolean);
+        try {
+          profile = await apiUpdateSeekerProfile({
+            headline: document.getElementById('edit-headline').value,
+            location: document.getElementById('edit-location').value,
+            bio: document.getElementById('edit-bio').value,
+            skills: skillArr,
+          });
+          toastSuccess('Profile updated');
+          document.querySelector('.wb-modal-backdrop')?.remove();
+          render();
+        } catch (err) { toastError(err.message); }
+      };
+    });
+
+    apiSeekerProfile().then(p => { profile = p; render(); }).catch(() => render());
+  </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Companies — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/public.css">
+</head>
+<body>
+  <header class="public-nav">
+    <div class="public-nav-inner">
+      <a href="index.html" class="public-nav-brand"><img src="assets/img/logo.png" alt="" class="public-nav-logo"><span>WorkBridge PH</span></a>
+      <ul class="public-nav-links">
+        <li><a href="jobs.html">Jobs</a></li>
+        <li><a href="categories.html">Categories</a></li>
+        <li><a href="companies.html">Companies</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="auth/login.html" class="btn btn-primary">Log in</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container page-transition py-4">
+    <h1 class="mb-4">Companies</h1>
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-8"><input type="text" id="search-company" class="form-input" placeholder="Search companies"></div>
+          <div class="col-md-4">
+            <select id="filter-verified" class="form-select">
+              <option value="">All</option>
+              <option value="verified">Verified only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="companies-list" class="jobs-grid"></div>
+  </main>
+
+  <script type="module" src="assets/js/app.js"></script>
+  <script type="module">
+    import { getCompaniesForBrowse } from './assets/js/jobs.module.js';
+    import { esc, companyAvatar, verifiedBadge, emptyState } from './assets/js/utils.js';
+
+    const grid = document.getElementById('companies-list');
+    let allCompanies = [];
+
+    async function load() {
+      grid.innerHTML = '<p class="text-secondary">Loading…</p>';
+      try {
+        const { companies } = await getCompaniesForBrowse({});
+        allCompanies = companies;
+        render();
+      } catch (err) {
+        grid.innerHTML = `<p class="text-danger">Error loading companies: ${esc(err.message)}</p>`;
+      }
+    }
+
+    function render() {
+      const q = (document.getElementById('search-company').value || '').toLowerCase();
+      let list = allCompanies.filter(c =>
+        !q || c.name.toLowerCase().includes(q) || (c.industry || '').toLowerCase().includes(q)
+      );
+      if (!list.length) {
+        grid.innerHTML = emptyState({
+          icon: 'building',
+          title: 'No companies match',
+          subtitle: 'Try a different search term or browse all companies.',
+        });
+        return;
+      }
+      grid.innerHTML = list.map(c => `
+        <a href="company-detail.html?id=${esc(c.id)}" class="job-card card-lift text-decoration-none text-dark">
+          <div class="d-flex gap-3 align-items-start mb-2">
+            ${companyAvatar(c, 56)}
+            <div style="min-width:0;flex:1">
+              <h3 class="job-card-title mb-1">${esc(c.name)}${verifiedBadge(c)}</h3>
+              ${(c.verifiedStatus || c.verified_status) === 'Verified' ? '<span class="badge badge-verified"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>' : ''}
+            </div>
+          </div>
+          <p class="job-card-company mb-1">${esc(c.industry || '—')} · ${esc(c.size || '—')} employees</p>
+          <p class="text-muted small mb-0"><i class="bi bi-geo-alt"></i> ${esc(c.location || '—')}</p>
+        </a>
+      `).join('');
+    }
+
+    document.getElementById('search-company').addEventListener('input', render);
+    load();
+  </script>
+</body>
+</html>

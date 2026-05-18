@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jobs — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/public.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Browse Jobs</h1>
+        <div class="card mb-4">
+          <div class="card-body">
+            <form class="row g-3" id="filter-form">
+              <div class="col-md-3"><input type="text" name="keyword" class="form-input" placeholder="Keyword" id="f-keyword"></div>
+              <div class="col-md-2"><input type="text" name="location" class="form-input" placeholder="Location" id="f-location"></div>
+              <div class="col-md-2"><select name="type" class="form-select" id="f-type"><option value="">Type</option><option value="Full-time">Full-time</option></select></div>
+              <div class="col-md-2"><select name="setup" class="form-select" id="f-setup"><option value="">Setup</option><option value="Remote">Remote</option></select></div>
+              <div class="col-md-2"><select name="sort" class="form-select" id="f-sort"><option value="">Sort</option><option value="newest">Newest</option></select></div>
+              <div class="col-md-1"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button></div>
+            </form>
+          </div>
+        </div>
+        <div id="jobs-list" class="jobs-grid"></div>
+        <div id="pagination" class="pagination mt-4"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module" src="../assets/js/seeker-jobs.js"></script>
+</body>
+</html>

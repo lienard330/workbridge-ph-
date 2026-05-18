@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Job — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Edit Job</h1>
+        <div id="edit-form-wrap"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiUpdateJob } from '../assets/js/api.js';
+    import { getJobById } from '../assets/js/jobs.module.js';
+    import { getQueryParams } from '../assets/js/router.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc } from '../assets/js/utils.js';
+
+    renderLayout('employer', 'Edit Job');
+    const params = getQueryParams();
+    const wrap = document.getElementById('edit-form-wrap');
+    wrap.innerHTML = '<p class="text-secondary">Loading…</p>';
+
+    getJobById(params.id).then(job => {
+      function sel(name, val, opts) {
+        return '<select name="' + name + '" class="form-select">' + opts.map(o => '<option value="' + o + '"' + (o === val ? ' selected' : '') + '>' + o + '</option>').join('') + '</select>';
+      }
+      wrap.innerHTML = '<form id="edit-form" class="card"><div class="card-body">' +
+        '<div class="form-group mb-3"><label class="form-label">Job Title *</label><input type="text" name="title" class="form-input" value="' + esc(job.title) + '" required></div>' +
+        '<div class="row"><div class="col-md-6"><div class="form-group mb-3"><label class="form-label">Job Type</label>' + sel('type', job.type, ['Full-time','Part-time','Contract','Freelance','Internship']) + '</div></div>' +
+        '<div class="col-md-6"><div class="form-group mb-3"><label class="form-label">Experience Level</label>' + sel('experience_level', job.experienceLevel, ['Entry-level','Mid-level','Senior','Executive']) + '</div></div></div>' +
+        '<div class="form-group mb-3"><label class="form-label">Location *</label><input type="text" name="location" class="form-input" value="' + esc(job.location) + '" required></div>' +
+        '<div class="row"><div class="col-md-6"><div class="form-group mb-3"><label class="form-label">Salary Min</label><input type="number" name="salary_min" class="form-input" value="' + (job.salaryMin || '') + '"></div></div>' +
+        '<div class="col-md-6"><div class="form-group mb-3"><label class="form-label">Salary Max</label><input type="number" name="salary_max" class="form-input" value="' + (job.salaryMax || '') + '"></div></div></div>' +
+        '<div class="form-group mb-3"><label class="form-label">Tags (comma-separated)</label><input type="text" name="tags" class="form-input" value="' + esc((job.tags || []).join(', ')) + '"></div>' +
+        '<div class="form-group mb-3"><label class="form-label">Description *</label><textarea name="description" class="form-textarea" required>' + esc(job.description || '') + '</textarea></div>' +
+        '<div class="form-group mb-3"><label class="form-label">Requirements</label><textarea name="requirements" class="form-textarea">' + esc(job.requirements || '') + '</textarea></div>' +
+        '<div class="form-group mb-3"><label class="form-label">Status</label>' + sel('status', job.status === 'Active' ? 'Open' : job.status, ['Open','Closed','Draft']) + '</div>' +
+        '<button type="submit" class="btn btn-primary">Save Changes</button>' +
+        '</div></form>';
+
+      document.getElementById('edit-form').onsubmit = async function(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const btn = e.target.querySelector('button[type=submit]');
+        btn.disabled = true;
+        try {
+          await apiUpdateJob(job.id, {
+            title: fd.get('title'), type: fd.get('type'),
+            experience_level: fd.get('experience_level'),
+            location: fd.get('location'),
+            salary_min: parseInt(fd.get('salary_min')) || null,
+            salary_max: parseInt(fd.get('salary_max')) || null,
+            tags: (fd.get('tags') || '').split(',').map(t => t.trim()).filter(Boolean),
+            description: fd.get('description'),
+            requirements: fd.get('requirements') || '',
+            status: fd.get('status'),
+          });
+          toastSuccess('Job updated');
+          setTimeout(() => window.location.href = 'manage-jobs.html', 500);
+        } catch (err) { toastError(err.message); btn.disabled = false; }
+      };
+    }).catch(() => { wrap.innerHTML = '<div class="empty-state"><p>Job not found.</p></div>'; });
+  </script>
+</body>
+</html>

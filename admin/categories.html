@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categories — WorkBridge PH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/seeker.css">
+  <link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="wb-loading">
+  <div id="app-layout" class="app-layout">
+    <main class="app-main">
+      <div class="app-content">
+        <h1 class="mb-4">Categories</h1>
+        <div class="card mb-4">
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <label class="form-label">New category</label>
+                <input type="text" id="new-cat" class="form-input" placeholder="Category name">
+              </div>
+              <div class="col-md-2">
+                <button id="add-cat" class="btn btn-primary w-100">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Name</th><th>Slug</th><th>Jobs</th><th>Actions</th></tr></thead>
+              <tbody id="cats-tbody"><tr><td colspan="4" class="text-secondary">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../assets/js/app.js"></script>
+  <script type="module">
+    import { renderLayout } from '../assets/js/layout.js';
+    import { apiGetCategories, apiAdminAddCategory, apiAdminDeleteCategory } from '../assets/js/api.js';
+    import { toastSuccess, toastError } from '../assets/js/ui.toast.js';
+    import { esc, skeletonTableRows } from '../assets/js/utils.js';
+
+    renderLayout('admin', 'Categories');
+    document.getElementById('cats-tbody').innerHTML = skeletonTableRows(5, 4);
+
+    let cats = [];
+
+    function render() {
+      const tbody = document.getElementById('cats-tbody');
+      if (!cats.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-secondary">No categories found.</td></tr>'; return; }
+      tbody.innerHTML = cats.map(c =>
+        `<tr><td>${esc(c.name)}</td><td>${esc(c.slug)}</td><td>${c.job_listings_count ?? 0}</td><td><button class="btn btn-ghost btn-sm delete-cat" data-id="${esc(String(c.id))}">Delete</button></td></tr>`
+      ).join('');
+      document.querySelectorAll('.delete-cat').forEach(b => {
+        b.onclick = async () => {
+          if (!confirm('Delete this category?')) return;
+          b.disabled = true;
+          try {
+            await apiAdminDeleteCategory(b.dataset.id);
+            cats = cats.filter(x => String(x.id) !== b.dataset.id);
+            render();
+            toastSuccess('Category deleted');
+          } catch (err) { toastError(err.message); b.disabled = false; }
+        };
+      });
+    }
+
+    document.getElementById('add-cat').onclick = async () => {
+      const name = document.getElementById('new-cat').value.trim();
+      if (!name) { toastError('Enter a category name'); return; }
+      const btn = document.getElementById('add-cat');
+      btn.disabled = true;
+      try {
+        const cat = await apiAdminAddCategory(name);
+        cats.push(cat);
+        render();
+        document.getElementById('new-cat').value = '';
+        toastSuccess('Category added');
+      } catch (err) { toastError(err.message); }
+      finally { btn.disabled = false; }
+    };
+
+    apiGetCategories().then(res => { cats = res.data || res; render(); })
+      .catch(err => { document.getElementById('cats-tbody').innerHTML = `<tr><td colspan="4" class="text-danger">${esc(err.message)}</td></tr>`; });
+  </script>
+</body>
+</html>
